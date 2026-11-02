@@ -1,4 +1,5 @@
 
+
 package com.codearena.dto;
 
 import java.util.List;
@@ -15,6 +16,8 @@ public record RunResponse(
         String status,
         String actualOutput,
         String expectedOutput,
-        String message
+        String message,
+        double executionTimeSeconds,
+        long memoryKb
     ) {}
 }
