@@ -1,4 +1,5 @@
 
+
 package com.codearena.service;
 
 import com.codearena.dto.RunRequest;
@@ -37,9 +38,7 @@ public class Judge0Service {
 
     public RunResponse run(RunRequest request) {
 
-        List<RunResponse.TestResult> results =
-            new ArrayList<>();
-
+        List<RunResponse.TestResult> results = new ArrayList<>();
         int passed = 0;
         int index = 0;
 
@@ -47,8 +46,7 @@ public class Judge0Service {
             index++;
 
             try {
-                Map<String, Object> payload =
-                    new LinkedHashMap<>();
+                Map<String, Object> payload = new LinkedHashMap<>();
 
                 payload.put("source_code", request.sourceCode());
                 payload.put("language_id", javaLanguageId);
@@ -70,11 +68,9 @@ public class Judge0Service {
                 }
 
                 String token = response.get("token").toString();
-
                 response = getResult(token);
 
                 String status = readStatus(response);
-
                 String actual = clean(response.get("stdout"));
                 String expected = clean(test.expectedOutput());
 
@@ -82,36 +78,35 @@ public class Judge0Service {
                     "Accepted".equalsIgnoreCase(status)
                     && actual.equals(expected);
 
-                if (accepted) {
-                    passed++;
-                }
+                if (accepted) passed++;
+
+                double executionTime = readDouble(response.get("time"));
+                long memory = readLong(response.get("memory"));
 
                 results.add(new RunResponse.TestResult(
                     index,
                     accepted ? "Accepted" : status,
                     actual,
                     expected,
-                    accepted ? "Test passed" : message(response, status)
+                    accepted ? "Test passed" : message(response, status),
+                    executionTime,
+                    memory
                 ));
 
             } catch (RestClientResponseException ex) {
 
                 results.add(new RunResponse.TestResult(
-                    index,
-                    "Judge Error",
-                    "",
-                    test.expectedOutput(),
-                    "Judge HTTP error: " + ex.getStatusCode().value()
+                    index, "Judge Error", "", test.expectedOutput(),
+                    "Judge HTTP error: " + ex.getStatusCode().value(),
+                    0.0, 0L
                 ));
 
             } catch (Exception ex) {
 
                 results.add(new RunResponse.TestResult(
-                    index,
-                    "Judge Error",
-                    "",
-                    test.expectedOutput(),
-                    "Could not complete code execution"
+                    index, "Judge Error", "", test.expectedOutput(),
+                    "Could not complete code execution",
+                    0.0, 0L
                 ));
             }
         }
@@ -132,7 +127,6 @@ public class Judge0Service {
     private Map getResult(String token) throws InterruptedException {
 
         for (int attempt = 0; attempt < 20; attempt++) {
-
             Thread.sleep(500);
 
             Map response = client.get()
@@ -161,24 +155,19 @@ public class Judge0Service {
 
     private String readStatus(Map response) {
 
-        if (response == null ||
-            !(response.get("status") instanceof Map)) {
+        if (response == null || !(response.get("status") instanceof Map)) {
             return "Unknown";
         }
 
         Map status = (Map) response.get("status");
         Object description = status.get("description");
 
-        return description == null
-            ? "Unknown"
-            : description.toString();
+        return description == null ? "Unknown" : description.toString();
     }
 
     private String message(Map response, String status) {
 
-        if (response == null) {
-            return "No response from judge";
-        }
+        if (response == null) return "No response from judge";
 
         Object stderr = response.get("stderr");
 
@@ -195,11 +184,26 @@ public class Judge0Service {
         return status;
     }
 
-    private String clean(Object value) {
-
-        if (value == null) {
-            return "";
+    private double readDouble(Object value) {
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        try {
+            return value == null ? 0.0 : Double.parseDouble(value.toString());
+        } catch (NumberFormatException ex) {
+            return 0.0;
         }
+    }
+
+    private long readLong(Object value) {
+        if (value instanceof Number) return ((Number) value).longValue();
+        try {
+            return value == null ? 0L : Long.parseLong(value.toString());
+        } catch (NumberFormatException ex) {
+            return 0L;
+        }
+    }
+
+    private String clean(Object value) {
+        if (value == null) return "";
 
         return value.toString()
             .replace("\r\n", "\n")
